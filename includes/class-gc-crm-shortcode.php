@@ -201,12 +201,41 @@ class GC_CRM_Shortcode {
             ARRAY_A
         );
 
+                $new_leads_count = (int) ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE status = %s", 'new_leads')) ?? 0);
+        $quote_sent_count = (int) ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE status = %s", 'quote_sent')) ?? 0);
+        $unassigned_count = (int) ($wpdb->get_var("SELECT COUNT(*) FROM {$leads_table} WHERE assigned_user_id = 0") ?? 0);
+
+        $todo_items = [];
+
+        if ($new_leads_count > 0) {
+            $todo_items[] = sprintf(
+                __('Call %d new lead(s) about test drives today.', 'gc-dealership-crm'),
+                $new_leads_count
+            );
+        }
+        if ($quote_sent_count > 0) {
+            $todo_items[] = sprintf(
+                __('Follow up on %d quote(s) with financing and accessory options.', 'gc-dealership-crm'),
+                $quote_sent_count
+            );
+        }
+        if ($unassigned_count > 0) {
+            $todo_items[] = sprintf(
+                __('Assign %d unassigned lead(s) to a sales rep before close.', 'gc-dealership-crm'),
+                $unassigned_count
+            );
+        }
+
+        $todo_items[] = __('Check trade-in inquiries and prep appraisal responses.', 'gc-dealership-crm');
+        $todo_items[] = __('Send weekend promo to warm leads interested in lifted carts.', 'gc-dealership-crm');
+
         return [
             'totals'         => $totals,
             'kanban'         => $kanban,
             'contacts'       => $contacts,
             'report_status'  => $report_status,
             'report_product' => $report_product,
+            'todo_items'     => $todo_items,
         ];
     }
 }
