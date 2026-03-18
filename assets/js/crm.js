@@ -24,15 +24,30 @@
     return response.json();
   };
 
-  const navItems = document.querySelectorAll('.gc-crm-nav__item');
-  const views = document.querySelectorAll('.gc-crm-view');
-  navItems.forEach((item) => {
+  const refreshSoon = () => setTimeout(() => window.location.reload(), 250);
+
+  document.querySelectorAll('.gc-crm-nav__item').forEach((item) => {
     item.addEventListener('click', () => {
       const target = item.dataset.view;
-      navItems.forEach((i) => i.classList.toggle('is-active', i === item));
-      views.forEach((view) => view.classList.toggle('is-active', view.dataset.view === target));
+      document.querySelectorAll('.gc-crm-nav__item').forEach((i) => i.classList.toggle('is-active', i === item));
+      document.querySelectorAll('.gc-crm-view').forEach((view) => view.classList.toggle('is-active', view.dataset.view === target));
     });
   });
+
+  const toggleAdd = document.getElementById('gc-crm-toggle-add');
+  const addWrap = document.getElementById('gc-crm-add-wrap');
+  if (toggleAdd && addWrap) {
+    toggleAdd.addEventListener('click', () => {
+      const isHidden = addWrap.hasAttribute('hidden');
+      if (isHidden) {
+        addWrap.removeAttribute('hidden');
+        toggleAdd.textContent = 'Close Add Lead';
+      } else {
+        addWrap.setAttribute('hidden', 'hidden');
+        toggleAdd.textContent = 'Add Lead';
+      }
+    });
+  }
 
   board.querySelectorAll('.gc-crm-lead').forEach((card) => {
     card.addEventListener('dragstart', () => {
@@ -55,8 +70,7 @@
       if (!status) return;
       zone.prepend(dragging);
 
-      const leadId = dragging.dataset.leadId;
-      const result = await request('gc_crm_update_lead_status', { lead_id: leadId, status });
+      const result = await request('gc_crm_update_lead_status', { lead_id: dragging.dataset.leadId, status });
       if (!result.success) alert((result.data && result.data.message) || gcCrmData.strings.error);
     });
   });
@@ -87,6 +101,7 @@
         };
         const result = await request('gc_crm_update_lead', payload);
         alert((result.data && result.data.message) || (result.success ? 'Saved.' : gcCrmData.strings.error));
+        if (result.success) refreshSoon();
       });
     }
 
@@ -101,14 +116,13 @@
 
     if (sendQuote) {
       sendQuote.addEventListener('click', async () => {
-        const quoteAmount = document.getElementById('gc-quote-amount').value;
-        const quoteMessage = document.getElementById('gc-quote-message').value;
         const result = await request('gc_crm_send_quote', {
           lead_id: lead.id,
-          quote_amount: quoteAmount,
-          quote_message: quoteMessage,
+          quote_amount: document.getElementById('gc-quote-amount').value,
+          quote_message: document.getElementById('gc-quote-message').value,
         });
         alert((result.data && result.data.message) || (result.success ? 'Quote sent' : gcCrmData.strings.error));
+        if (result.success) refreshSoon();
       });
     }
   };
@@ -120,6 +134,7 @@
 
       const { lead, products, notes, activity, users } = result.data;
       const userOptions = (users || []).map((user) => `<option value="${escapeHtml(user.ID)}" ${String(user.ID) === String(lead.assigned_user_id) ? 'selected' : ''}>${escapeHtml(user.display_name)}</option>`).join('');
+
       content.innerHTML = `
         <h3>Lead Details</h3>
         <div class="gc-crm-grid-2">
@@ -144,9 +159,9 @@
           </div>
           <div>
             <h4>Interested Product(s)</h4>
-            <ul>${products.map((p) => `<li>${escapeHtml(p.product_name)} (${escapeHtml(p.product_sku || 'N/A')})</li>`).join('') || '<li>None linked</li>'}</ul>
+            <ul>${products.map((p) => `<li>${p.image_url ? `<img src="${escapeHtml(p.image_url)}" alt="${escapeHtml(p.product_name)}" style="max-width:120px;display:block;margin-bottom:4px;border-radius:8px;" />` : ''}${escapeHtml(p.product_name)} (${escapeHtml(p.product_sku || 'N/A')})</li>`).join('') || '<li>None linked</li>'}</ul>
             <h4>Send Quote</h4>
-            <input id="gc-quote-amount" type="number" step="0.01" placeholder="Quote amount" value="${escapeHtml(lead.estimated_value || 0)}" />
+            <input id="gc-quote-amount" type="number" step="0.01" value="${escapeHtml(lead.estimated_value || 0)}" />
             <textarea id="gc-quote-message" placeholder="Optional quote message"></textarea>
             <button type="button" id="gc-crm-send-quote">Send Quote Email</button>
             <h4>Notes</h4>
@@ -158,6 +173,7 @@
         <h4>Activity</h4>
         <ul>${activity.map((a) => `<li>${escapeHtml(a.message)} <small>${escapeHtml(a.created_at)}</small></li>`).join('')}</ul>
       `;
+
       modal.setAttribute('aria-hidden', 'false');
       bindLeadModalActions(lead);
     });
@@ -167,11 +183,13 @@
   if (createLeadForm) {
     createLeadForm.addEventListener('submit', async (e) => {
       e.preventDefault();
-      const formData = new FormData(createLeadForm);
-      const payload = Object.fromEntries(formData.entries());
+      const payload = Object.fromEntries(new FormData(createLeadForm).entries());
       const result = await request('gc_crm_create_lead', payload);
       alert((result.data && result.data.message) || (result.success ? 'Lead created.' : gcCrmData.strings.error));
-      if (result.success) createLeadForm.reset();
+      if (result.success) {
+        createLeadForm.reset();
+        refreshSoon();
+      }
     });
   }
 
