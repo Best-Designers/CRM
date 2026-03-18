@@ -156,9 +156,9 @@ class GC_CRM_Shortcode {
         $totals = [
             'total_leads'        => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$leads_table}"),
             'active_deals'       => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$deals_table} WHERE stage = %s", 'open')),
-            'pipeline_value'     => (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(estimated_value),0) FROM {$leads_table} WHERE status NOT IN (%s,%s)", 'sold', 'lost')),
-            'closed_sales'       => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE status = %s", 'sold')),
-            'closed_sales_value' => (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(estimated_value),0) FROM {$leads_table} WHERE status = %s", 'sold')),
+            'pipeline_value'     => (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(estimated_value),0) FROM {$leads_table} WHERE status NOT IN (%s,%s,%s)", 'sold', 'archived_sold', 'lost')),
+            'closed_sales'       => (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE status IN (%s,%s)", 'sold', 'archived_sold')),
+            'closed_sales_value' => (float) $wpdb->get_var($wpdb->prepare("SELECT COALESCE(SUM(estimated_value),0) FROM {$leads_table} WHERE status IN (%s,%s)", 'sold', 'archived_sold')),
             'total_contacts'     => (int) $wpdb->get_var("SELECT COUNT(*) FROM {$contacts_table}"),
         ];
 
