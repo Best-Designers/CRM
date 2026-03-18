@@ -41,7 +41,6 @@ $export_base  = home_url(add_query_arg([]));
         <div class="gc-crm-report-card gc-crm-todo">
             <div class="gc-crm-todo__head">
                 <h4><?php esc_html_e('To Do List', 'gc-dealership-crm'); ?></h4>
-                <button type="button" class="gc-crm-todo__clear" id="gc-crm-todo-clear"><?php esc_html_e('Clear All', 'gc-dealership-crm'); ?></button>
             </div>
             <form class="gc-crm-todo__add" id="gc-crm-todo-add-form">
                 <input type="text" id="gc-crm-todo-add-input" name="todo_text" placeholder="<?php esc_attr_e('Add a new to-do item', 'gc-dealership-crm'); ?>" />
