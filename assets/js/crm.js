@@ -96,7 +96,14 @@
     const saveNote = document.getElementById('gc-crm-note-save');
     const sendQuote = document.getElementById('gc-crm-send-quote');
     const deleteLead = document.getElementById('gc-crm-delete-lead');
+const archiveLead = document.getElementById('gc-crm-archive-lead');
+    const statusSelect = document.getElementById('gc-status');
 
+    const syncArchiveVisibility = () => {
+      if (!archiveLead || !statusSelect) return;
+      archiveLead.hidden = statusSelect.value !== 'sold';
+    };
+    
     if (saveLead) {
       saveLead.addEventListener('click', async () => {
         const payload = {
@@ -146,6 +153,20 @@
         if (result.success) refreshSoon();
       });
     }
+  
+    if (archiveLead) {
+      archiveLead.addEventListener('click', async () => {
+        if (!confirmAction('Archive this sold lead?')) return;
+        const result = await request('gc_crm_archive_lead', { lead_id: lead.id });
+        alert((result.data && result.data.message) || (result.success ? 'Lead archived.' : gcCrmData.strings.error));
+        if (result.success) refreshSoon();
+      });
+    }
+
+    if (statusSelect) {
+      statusSelect.addEventListener('change', syncArchiveVisibility);
+      syncArchiveVisibility();
+    }
   };
 
   document.querySelectorAll('.gc-crm-open-lead').forEach((btn) => {
@@ -172,11 +193,13 @@
               <option value="contacted" ${lead.status === 'contacted' ? 'selected' : ''}>Contacted</option>
               <option value="quote_sent" ${lead.status === 'quote_sent' ? 'selected' : ''}>Quote Sent</option>
               <option value="sold" ${lead.status === 'sold' ? 'selected' : ''}>Sold</option>
+              <option value="archived_sold" ${lead.status === 'archived_sold' ? 'selected' : ''}>Archived (Sold)</option>
               <option value="lost" ${lead.status === 'lost' ? 'selected' : ''}>Lost</option>
             </select>
             <label>Assigned User</label><select id="gc-assigned"><option value="0">Unassigned</option>${userOptions}</select>
             <label>Estimated Value</label><input id="gc-value" type="number" step="0.01" value="${escapeHtml(lead.estimated_value || 0)}" />
             <button type="button" id="gc-crm-save-lead">Save Lead</button>
+            <button type="button" id="gc-crm-archive-lead">Archive Sold Lead</button>
             <button type="button" id="gc-crm-delete-lead">Delete Lead</button>
           </div>
           <div>
@@ -234,11 +257,11 @@
   const todoList = document.getElementById('gc-crm-todo-list');
   const todoAddForm = document.getElementById('gc-crm-todo-add-form');
   const todoAddInput = document.getElementById('gc-crm-todo-add-input');
+  const todoAddButton = document.getElementById('gc-crm-todo-add-button');
   const todoClearButton = document.getElementById('gc-crm-todo-clear');
 
-  if (todoAddForm && todoAddInput) {
-    todoAddForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
+  const submitTodoAdd = async () => {
+      if (!todoAddInput) return;
       const text = todoAddInput.value.trim();
       if (!text) return;
 
@@ -248,6 +271,19 @@
         todoAddInput.value = '';
         refreshSoon();
       }
+        };
+
+  if (todoAddForm && todoAddInput) {
+    todoAddForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      await submitTodoAdd();
+    });
+  }
+
+  if (todoAddButton) {
+    todoAddButton.addEventListener('click', async (e) => {
+      e.preventDefault();
+      await submitTodoAdd();
     });
   }
 
@@ -269,13 +305,16 @@
       const todoId = item.dataset.todoId;
       if (!todoId) return;
 
-      if (target.classList.contains('gc-crm-todo-remove')) {
+      const removeButton = target.closest('.gc-crm-todo-remove');
+      const editButton = target.closest('.gc-crm-todo-edit');
+
+      if (removeButton) {
         const result = await request('gc_crm_delete_todo', { todo_id: todoId });
         alert((result.data && result.data.message) || (result.success ? 'Task removed.' : gcCrmData.strings.error));
         if (result.success) item.remove();
       }
 
-      if (target.classList.contains('gc-crm-todo-edit')) {
+      if (editButton) {
         const textEl = item.querySelector('.gc-crm-todo-text');
         const currentText = textEl ? textEl.textContent.trim() : '';
         const nextText = window.prompt('Edit to-do item', currentText);
@@ -297,20 +336,23 @@
     contactsTable.addEventListener('click', async (e) => {
       const target = e.target;
       if (!(target instanceof HTMLElement)) return;
-
-      if (target.classList.contains('gc-crm-delete-contact')) {
+const deleteButton = target.closest('.gc-crm-delete-contact');
+      const editButton = target.closest('.gc-crm-edit-contact');
+      
+      if (deleteButton) {
         if (!confirmAction('Delete this contact and related leads? This cannot be undone.')) return;
-        const result = await request('gc_crm_delete_contact', { contact_id: target.dataset.contactId });
+        const contactId = deleteButton.dataset.contactId || deleteButton.closest('tr')?.dataset.contactId || '';
+        const result = await request('gc_crm_delete_contact', { contact_id: contactId });
         alert((result.data && result.data.message) || (result.success ? 'Contact deleted.' : gcCrmData.strings.error));
         if (result.success) {
-          const row = target.closest('tr');
+          const row = deleteButton.closest('tr');
           if (row) row.remove();
         }
         return;
       }
 
-      if (target.classList.contains('gc-crm-edit-contact')) {
-        const row = target.closest('tr');
+     if (editButton) {
+        const row = editButton.closest('tr');
         if (!row) return;
 
         const currentName = row.children[0] ? row.children[0].textContent.trim() : '';
@@ -326,7 +368,7 @@
         if (companyPrompt === null) return;
 
         const payload = {
-          contact_id: target.dataset.contactId,
+          contact_id: editButton.dataset.contactId || row.dataset.contactId || '',
           first_name: firstPrompt.trim(),
           last_name: lastPrompt.trim(),
           email: emailPrompt.trim(),
