@@ -177,6 +177,7 @@ class GC_CRM_Integrations {
         self::log_activity($lead_id, 0, 'lead_created', 'Lead created from Contact Form 7 submission.');
 
         self::maybe_link_product($lead_id, $posted_data, $map);
+        self::send_auto_response($email, $first_name, $last_name);
     }
 
     private static function maybe_link_product(int $lead_id, array $posted_data, array $map): void {
@@ -227,13 +228,55 @@ class GC_CRM_Integrations {
         );
     }
 
-    private static function extract_field(array $posted_data, array $map, string $key): string {
-        $field = isset($map[$key]) ? (string) $map[$key] : '';
-        if (! $field || ! isset($posted_data[$field])) {
-            return '';
+    private static function send_auto_response(string $email, string $first_name, string $last_name): void {
+        if (! $email) {
+            return;
         }
 
-        $value = $posted_data[$field];
+        $name = trim($first_name . ' ' . $last_name);
+        $subject = __('Thanks for contacting us about a golf cart', 'gc-dealership-crm');
+        $message = sprintf(
+            "Hi %s,
+
+Thanks for contacting us. A dealership team member will reach out shortly with details, availability, and pricing options.
+
+If you have specific requirements (seats, range, accessories), just reply to this email.",
+            $name ?: __('there', 'gc-dealership-crm')
+        );
+
+        wp_mail($email, $subject, $message);
+    }
+
+    private static function extract_field(array $posted_data, array $map, string $key): string {
+        $field = isset($map[$key]) ? (string) $map[$key] : '';
+        if ($field && isset($posted_data[$field])) {
+            return self::normalize_field_value($posted_data[$field]);
+        }
+
+        $fallback_map = [
+            'first_name' => ['first_name', 'your-name', 'name', 'fname'],
+            'last_name'  => ['last_name', 'lname', 'last-name'],
+            'email'      => ['your-email', 'email', 'user_email'],
+            'phone'      => ['your-phone', 'phone', 'tel', 'mobile'],
+            'message'    => ['your-message', 'message', 'inquiry'],
+            'source'     => ['gc_source', 'source'],
+            'product_id' => ['gc_product_id', 'product_id'],
+            'product_name' => ['gc_product_name', 'product_name'],
+            'product_sku' => ['gc_product_sku', 'product_sku'],
+            'product_url' => ['gc_product_url', 'product_url'],
+            'product_price' => ['gc_product_price', 'product_price'],
+        ];
+
+        foreach ($fallback_map[$key] ?? [] as $candidate) {
+            if (isset($posted_data[$candidate])) {
+                return self::normalize_field_value($posted_data[$candidate]);
+            }
+        }
+
+        return '';
+    }
+
+    private static function normalize_field_value($value): string {
         if (is_array($value)) {
             $value = implode(', ', array_map('sanitize_text_field', $value));
         }

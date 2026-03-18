@@ -42,6 +42,22 @@ $export_base  = home_url(add_query_arg([]));
             <a class="gc-crm-export" href="<?php echo esc_url(add_query_arg(['gc_crm_export' => 'leads', '_wpnonce' => $export_nonce], $export_base)); ?>"><?php esc_html_e('Export Leads CSV', 'gc-dealership-crm'); ?></a>
         </div>
 
+
+        <form id="gc-crm-create-lead" class="gc-crm-create-lead">
+            <input type="text" name="first_name" placeholder="First name" />
+            <input type="text" name="last_name" placeholder="Last name" />
+            <input type="email" name="email" placeholder="Email" />
+            <input type="text" name="phone" placeholder="Phone" />
+            <input type="text" name="title" placeholder="Lead title" />
+            <select name="status">
+                <?php foreach ($label_map as $status_key => $label) : ?>
+                    <option value="<?php echo esc_attr($status_key); ?>"><?php echo esc_html($label); ?></option>
+                <?php endforeach; ?>
+            </select>
+            <textarea name="details" placeholder="Details"></textarea>
+            <button type="submit"><?php esc_html_e('Add Lead', 'gc-dealership-crm'); ?></button>
+        </form>
+
         <div class="gc-crm-filters">
             <input type="search" id="gc-crm-search" placeholder="<?php esc_attr_e('Search by name, email, phone', 'gc-dealership-crm'); ?>" />
             <select id="gc-crm-status-filter">
