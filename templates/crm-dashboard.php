@@ -49,12 +49,9 @@ $export_base  = home_url(add_query_arg([]));
                     <?php if (! empty($todo['removed'])) {
                         continue;
                     } ?>
-                    <li class="gc-crm-todo-item <?php echo ! empty($todo['checked']) ? 'is-checked' : ''; ?>" data-todo-id="<?php echo esc_attr((string) $todo['id']); ?>">
+                    <li class="gc-crm-todo-item" data-todo-id="<?php echo esc_attr((string) $todo['id']); ?>">
                         <div class="gc-crm-todo-item__main">
-                            <label>
-                                <input type="checkbox" class="gc-crm-todo-check" <?php checked(! empty($todo['checked'])); ?> />
-                                <span class="gc-crm-todo-text"><?php echo esc_html((string) ($todo['text'] ?? '')); ?></span>
-                            </label>
+                           <span class="gc-crm-todo-text"><?php echo esc_html((string) ($todo['text'] ?? '')); ?></span>
                         </div>
                         <div class="gc-crm-todo-item__actions">
                             <?php if (empty($todo['is_auto'])) : ?>
@@ -112,7 +109,6 @@ $export_base  = home_url(add_query_arg([]));
                             $full_name = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
                             ?>
                             <article class="gc-crm-lead" draggable="true" data-lead-id="<?php echo esc_attr((string) $lead['id']); ?>" data-status="<?php echo esc_attr($status_key); ?>">
-                                <button type="button" class="gc-crm-lead-remove" data-lead-id="<?php echo esc_attr((string) $lead['id']); ?>" aria-label="<?php esc_attr_e('Delete lead', 'gc-dealership-crm'); ?>">&times;</button>
                                 <header>
                                     <strong><?php echo esc_html($full_name ?: __('Unnamed Lead', 'gc-dealership-crm')); ?></strong>
                                     <span><?php echo esc_html($money((float) $lead['estimated_value'])); ?></span>
