@@ -19,15 +19,12 @@ class GC_CRM_Integrations {
 
         wp_enqueue_style('gc-crm-product-style', GC_CRM_PLUGIN_URL . 'assets/css/product-inquiry.css', [], GC_CRM_VERSION);
         wp_enqueue_script('gc-crm-product-script', GC_CRM_PLUGIN_URL . 'assets/js/product-inquiry.js', [], GC_CRM_VERSION, true);
-        wp_localize_script('gc-crm-product-script', 'gcCrmProduct', [
-            'closeText' => __('Close', 'gc-dealership-crm'),
-        ]);
     }
 
     public static function render_inquiry_button(): void {
         global $product;
 
-        if (! $product instanceof WC_Product) {
+        if (! function_exists('is_product') || ! is_product() || ! $product instanceof WC_Product) {
             return;
         }
 
@@ -39,7 +36,7 @@ class GC_CRM_Integrations {
             'price' => (float) wc_get_price_to_display($product),
         ];
 
-        echo '<button type="button" class="button gc-crm-inquire-button" data-gc-product="' . esc_attr(wp_json_encode($payload)) . '">';
+        echo '<button type="button" class="button alt gc-crm-inquire-button" data-gc-product="' . esc_attr(wp_json_encode($payload)) . '">';
         echo esc_html__('Inquire for More Information', 'gc-dealership-crm');
         echo '</button>';
     }
@@ -49,19 +46,43 @@ class GC_CRM_Integrations {
             return;
         }
 
-        $form_id = (int) get_option('gc_crm_cf7_form_id', 0);
-        if (! $form_id) {
-            return;
-        }
-
         echo '<div class="gc-crm-modal" id="gc-crm-product-modal" aria-hidden="true">';
         echo '<div class="gc-crm-modal__backdrop" data-gc-close></div>';
         echo '<div class="gc-crm-modal__content" role="dialog" aria-modal="true">';
         echo '<button type="button" class="gc-crm-modal__close" data-gc-close aria-label="' . esc_attr__('Close', 'gc-dealership-crm') . '">&times;</button>';
         echo '<h3>' . esc_html__('Product Inquiry', 'gc-dealership-crm') . '</h3>';
-        echo do_shortcode('[contact-form-7 id="' . $form_id . '"]'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
+        if (! shortcode_exists('contact-form-7')) {
+            echo '<p>' . esc_html__('Contact Form 7 is required to render the inquiry form.', 'gc-dealership-crm') . '</p>';
+        } else {
+            $form_id = self::get_cf7_form_id();
+            if ($form_id > 0) {
+                echo do_shortcode('[contact-form-7 id="' . $form_id . '"]'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            } else {
+                echo '<p>' . esc_html__('No Contact Form 7 form was found. Create one and optionally set option `gc_crm_cf7_form_id`.', 'gc-dealership-crm') . '</p>';
+            }
+        }
+
         echo '</div>';
         echo '</div>';
+    }
+
+    private static function get_cf7_form_id(): int {
+        $stored = (int) get_option('gc_crm_cf7_form_id', 0);
+        if ($stored > 0) {
+            return $stored;
+        }
+
+        $forms = get_posts([
+            'post_type'      => 'wpcf7_contact_form',
+            'post_status'    => 'publish',
+            'posts_per_page' => 1,
+            'fields'         => 'ids',
+            'orderby'        => 'date',
+            'order'          => 'ASC',
+        ]);
+
+        return ! empty($forms[0]) ? (int) $forms[0] : 0;
     }
 
     public static function capture_cf7_submission($contact_form): void {
@@ -138,16 +159,16 @@ class GC_CRM_Integrations {
         $wpdb->insert(
             $leads_table,
             [
-                'contact_id'        => $contact_id,
-                'assigned_user_id'  => 0,
-                'source'            => sanitize_text_field($source ?: 'contact_form_7'),
-                'source_ref'        => 'cf7:' . absint($contact_form->id()),
-                'status'            => 'new_leads',
-                'title'             => $lead_title,
-                'details'           => wp_kses_post($message),
-                'estimated_value'   => 0,
-                'created_at'        => GC_CRM_DB::now(),
-                'updated_at'        => GC_CRM_DB::now(),
+                'contact_id'       => $contact_id,
+                'assigned_user_id' => 0,
+                'source'           => sanitize_text_field($source ?: 'contact_form_7'),
+                'source_ref'       => 'cf7:' . absint($contact_form->id()),
+                'status'           => 'new_leads',
+                'title'            => $lead_title,
+                'details'          => wp_kses_post($message),
+                'estimated_value'  => 0,
+                'created_at'       => GC_CRM_DB::now(),
+                'updated_at'       => GC_CRM_DB::now(),
             ],
             ['%d', '%d', '%s', '%s', '%s', '%s', '%s', '%f', '%s', '%s']
         );
@@ -195,12 +216,12 @@ class GC_CRM_Integrations {
         $wpdb->insert(
             $table,
             [
-                'lead_id'        => $lead_id,
-                'user_id'        => $user_id,
-                'activity_type'  => sanitize_key($type),
-                'message'        => sanitize_text_field($message),
-                'meta'           => wp_json_encode($meta),
-                'created_at'     => GC_CRM_DB::now(),
+                'lead_id'       => $lead_id,
+                'user_id'       => $user_id,
+                'activity_type' => sanitize_key($type),
+                'message'       => sanitize_text_field($message),
+                'meta'          => wp_json_encode($meta),
+                'created_at'    => GC_CRM_DB::now(),
             ],
             ['%d', '%d', '%s', '%s', '%s', '%s']
         );

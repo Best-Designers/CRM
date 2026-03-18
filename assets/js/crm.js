@@ -16,10 +16,7 @@
 
   const request = async (action, data = {}, method = 'POST') => {
     const payload = new URLSearchParams({ action, nonce: gcCrmData.nonce, ...data });
-
-    const url = method === 'GET'
-      ? `${gcCrmData.ajaxUrl}?${payload.toString()}`
-      : gcCrmData.ajaxUrl;
+    const url = method === 'GET' ? `${gcCrmData.ajaxUrl}?${payload.toString()}` : gcCrmData.ajaxUrl;
 
     const response = await fetch(url, {
       method,
@@ -27,14 +24,26 @@
       body: method === 'POST' ? payload.toString() : undefined,
       credentials: 'same-origin',
     });
+
     return response.json();
   };
+
+  const navItems = document.querySelectorAll('.gc-crm-nav__item');
+  const views = document.querySelectorAll('.gc-crm-view');
+  navItems.forEach((item) => {
+    item.addEventListener('click', () => {
+      const target = item.dataset.view;
+      navItems.forEach((i) => i.classList.toggle('is-active', i === item));
+      views.forEach((view) => view.classList.toggle('is-active', view.dataset.view === target));
+    });
+  });
 
   board.querySelectorAll('.gc-crm-lead').forEach((card) => {
     card.addEventListener('dragstart', () => {
       dragging = card;
       card.classList.add('is-dragging');
     });
+
     card.addEventListener('dragend', () => {
       card.classList.remove('is-dragging');
       dragging = null;
@@ -46,13 +55,15 @@
     zone.addEventListener('drop', async (e) => {
       e.preventDefault();
       if (!dragging) return;
+
       const column = zone.closest('.gc-crm-column');
       const status = column ? column.dataset.status : '';
       if (!status) return;
-      zone.prepend(dragging);
 
+      zone.prepend(dragging);
       const leadId = dragging.dataset.leadId;
       const result = await request('gc_crm_update_lead_status', { lead_id: leadId, status });
+
       if (!result.success) {
         alert((result.data && result.data.message) || gcCrmData.strings.error);
       }
@@ -62,16 +73,15 @@
   const modal = document.getElementById('gc-crm-lead-modal');
   const content = document.getElementById('gc-crm-lead-content');
   const closeModal = () => modal && modal.setAttribute('aria-hidden', 'true');
-
   document.querySelectorAll('[data-close]').forEach((el) => el.addEventListener('click', closeModal));
 
   document.querySelectorAll('.gc-crm-open-lead').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const leadId = btn.dataset.leadId;
-      const result = await request('gc_crm_get_lead_detail', { lead_id: leadId }, 'GET');
+      const result = await request('gc_crm_get_lead_detail', { lead_id: btn.dataset.leadId }, 'GET');
       if (!result.success || !content || !modal) {
         return;
       }
+
       const { lead, products, notes, activity } = result.data;
       content.innerHTML = `
         <h3>${escapeHtml(lead.first_name || '')} ${escapeHtml(lead.last_name || '')}</h3>
@@ -91,7 +101,7 @@
           <h4>Notes</h4>
           <ul>${notes.map((n) => `<li>${escapeHtml(n.note)} <small>${escapeHtml(n.display_name || 'System')} - ${escapeHtml(n.created_at)}</small></li>`).join('')}</ul>
           <textarea id="gc-crm-note-input" placeholder="Add note"></textarea>
-          <button type="button" id="gc-crm-note-save" data-lead-id="${escapeHtml(lead.id)}">Save Note</button>
+          <button type="button" id="gc-crm-note-save">Save Note</button>
         </div>
       `;
       modal.setAttribute('aria-hidden', 'false');

@@ -7,6 +7,24 @@
   const openModal = () => modal.setAttribute('aria-hidden', 'false');
   const closeModal = () => modal.setAttribute('aria-hidden', 'true');
 
+  const setHiddenValue = (name, value) => {
+    let found = false;
+    modal.querySelectorAll(`[name="${name}"]`).forEach((input) => {
+      input.value = value;
+      found = true;
+    });
+
+    if (!found) {
+      const form = modal.querySelector('form');
+      if (!form) return;
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = name;
+      input.value = value;
+      form.appendChild(input);
+    }
+  };
+
   document.querySelectorAll('.gc-crm-inquire-button').forEach((button) => {
     button.addEventListener('click', () => {
       const payload = button.getAttribute('data-gc-product');
@@ -22,11 +40,7 @@
             gc_source: 'woocommerce_product',
           };
 
-          Object.entries(map).forEach(([name, value]) => {
-            modal.querySelectorAll(`[name="${name}"]`).forEach((input) => {
-              input.value = value;
-            });
-          });
+          Object.entries(map).forEach(([name, value]) => setHiddenValue(name, value));
         } catch (e) {
           // noop
         }
