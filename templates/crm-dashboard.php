@@ -30,16 +30,37 @@ $export_base  = home_url(add_query_arg([]));
         <div class="gc-crm-top">
             <div class="gc-crm-card"><strong><?php esc_html_e('Total Leads', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html((string) $data['totals']['total_leads']); ?></span></div>
             <div class="gc-crm-card"><strong><?php esc_html_e('Active Deals', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html((string) $data['totals']['active_deals']); ?></span></div>
-            <div class="gc-crm-card"><strong><?php esc_html_e('Total Pipeline Value', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html($money($data['totals']['pipeline_value'])); ?></span></div>
+            <div class="gc-crm-card"><strong><?php esc_html_e('Pipeline Value', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html($money($data['totals']['pipeline_value'])); ?></span></div>
             <div class="gc-crm-card"><strong><?php esc_html_e('Closed Sales', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html((string) $data['totals']['closed_sales']); ?></span></div>
             <div class="gc-crm-card"><strong><?php esc_html_e('Total Contacts', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html((string) $data['totals']['total_contacts']); ?></span></div>
         </div>
         
         <div class="gc-crm-report-card gc-crm-todo">
-            <h4><?php esc_html_e('Sales Team To-Do', 'gc-dealership-crm'); ?></h4>
-            <ul>
+            <div class="gc-crm-todo__head">
+                <h4><?php esc_html_e('To Do List', 'gc-dealership-crm'); ?></h4>
+                <button type="button" class="gc-crm-todo__clear" id="gc-crm-todo-clear"><?php esc_html_e('Clear All', 'gc-dealership-crm'); ?></button>
+            </div>
+            <form class="gc-crm-todo__add" id="gc-crm-todo-add-form">
+                <input type="text" id="gc-crm-todo-add-input" placeholder="<?php esc_attr_e('Add a new to-do item', 'gc-dealership-crm'); ?>" />
+                <button type="submit"><?php esc_html_e('Add', 'gc-dealership-crm'); ?></button>
+            </form>
+            <ul id="gc-crm-todo-list">
                 <?php foreach (($data['todo_items'] ?? []) as $todo) : ?>
-                    <li><span><?php echo esc_html($todo); ?></span></li>
+                    <?php if (! empty($todo['removed'])) {
+                        continue;
+                    } ?>
+                    <li class="gc-crm-todo-item <?php echo ! empty($todo['checked']) ? 'is-checked' : ''; ?>" data-todo-id="<?php echo esc_attr((string) $todo['id']); ?>">
+                        <label>
+                            <input type="checkbox" class="gc-crm-todo-check" <?php checked(! empty($todo['checked'])); ?> />
+                            <span class="gc-crm-todo-text"><?php echo esc_html((string) ($todo['text'] ?? '')); ?></span>
+                        </label>
+                        <div class="gc-crm-todo-item__actions">
+                            <?php if (empty($todo['is_auto'])) : ?>
+                                <button type="button" class="gc-crm-todo-edit"><?php esc_html_e('Edit', 'gc-dealership-crm'); ?></button>
+                            <?php endif; ?>
+                            <button type="button" class="gc-crm-todo-remove"><?php esc_html_e('Remove', 'gc-dealership-crm'); ?></button>
+                        </div>
+                    </li>
                 <?php endforeach; ?>
             </ul>
         </div>
@@ -122,16 +143,18 @@ $export_base  = home_url(add_query_arg([]));
                     <th><?php esc_html_e('Phone', 'gc-dealership-crm'); ?></th>
                     <th><?php esc_html_e('Company', 'gc-dealership-crm'); ?></th>
                     <th><?php esc_html_e('Created', 'gc-dealership-crm'); ?></th>
+                    <th><?php esc_html_e('Actions', 'gc-dealership-crm'); ?></th>
                 </tr>
                 </thead>
                 <tbody>
                 <?php foreach ($data['contacts'] as $contact) : ?>
-                    <tr>
+                    <tr data-contact-id="<?php echo esc_attr((string) $contact['id']); ?>">
                         <td><?php echo esc_html(trim($contact['first_name'] . ' ' . $contact['last_name'])); ?></td>
                         <td><?php echo esc_html((string) $contact['email']); ?></td>
                         <td><?php echo esc_html((string) $contact['phone']); ?></td>
                         <td><?php echo esc_html((string) $contact['company']); ?></td>
                         <td><?php echo esc_html((string) $contact['created_at']); ?></td>
+                        <td><button type="button" class="gc-crm-delete-contact" data-contact-id="<?php echo esc_attr((string) $contact['id']); ?>"><?php esc_html_e('Delete', 'gc-dealership-crm'); ?></button></td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
