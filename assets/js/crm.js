@@ -262,7 +262,6 @@ const archiveLead = document.getElementById('gc-crm-archive-lead');
   const todoAddForm = document.getElementById('gc-crm-todo-add-form');
   const todoAddInput = document.getElementById('gc-crm-todo-add-input');
   const todoAddButton = document.getElementById('gc-crm-todo-add-button');
-  const todoClearButton = document.getElementById('gc-crm-todo-clear');
 
   const submitTodoAdd = async () => {
       if (!todoAddInput) return;
@@ -288,15 +287,6 @@ const archiveLead = document.getElementById('gc-crm-archive-lead');
     todoAddButton.addEventListener('click', async (e) => {
       e.preventDefault();
       await submitTodoAdd();
-    });
-  }
-
-  if (todoClearButton) {
-    todoClearButton.addEventListener('click', async () => {
-      if (!confirmAction('Clear all to-do items?')) return;
-      const result = await request('gc_crm_clear_todos');
-      alert((result.data && result.data.message) || (result.success ? 'To-do list cleared.' : gcCrmData.strings.error));
-      if (result.success) refreshSoon();
     });
   }
 
@@ -343,60 +333,58 @@ const archiveLead = document.getElementById('gc-crm-archive-lead');
     });
   }
 
-  const contactsTable = document.querySelector('.gc-crm-table');
-  if (contactsTable) {
-    contactsTable.addEventListener('click', async (e) => {
-      const target = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
-      if (!(target instanceof Element)) return;
-const deleteButton = target.closest('.gc-crm-delete-contact');
-      const editButton = target.closest('.gc-crm-edit-contact');
-      
-      if (deleteButton) {
-        if (!confirmAction('Delete this contact and related leads? This cannot be undone.')) return;
-        const contactId = deleteButton.dataset.contactId || deleteButton.closest('tr')?.dataset.contactId || '';
-        const result = await request('gc_crm_delete_contact', { contact_id: contactId });
-        alert((result.data && result.data.message) || (result.success ? 'Contact deleted.' : gcCrmData.strings.error));
-        if (result.success) {
-          const row = deleteButton.closest('tr');
-          if (row) row.remove();
-        }
-        return;
-      }
+  document.addEventListener('click', async (e) => {
+    const target = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
+    if (!(target instanceof Element)) return;
 
-     if (editButton) {
-        const row = editButton.closest('tr');
-        if (!row) return;
+     const deleteButton = target.closest('.gc-crm-delete-contact');
+    const editButton = target.closest('.gc-crm-edit-contact');
+    if (!deleteButton && !editButton) return;
 
-        const currentName = row.children[0] ? row.children[0].textContent.trim() : '';
-        const firstPrompt = window.prompt('First name', currentName.split(' ')[0] || '');
-        if (firstPrompt === null) return;
-        const lastPrompt = window.prompt('Last name', currentName.split(' ').slice(1).join(' ') || '');
-        if (lastPrompt === null) return;
-        const emailPrompt = window.prompt('Email', row.children[1] ? row.children[1].textContent.trim() : '');
-        if (emailPrompt === null) return;
-        const phonePrompt = window.prompt('Phone', row.children[2] ? row.children[2].textContent.trim() : '');
-        if (phonePrompt === null) return;
-        const companyPrompt = window.prompt('Company', row.children[3] ? row.children[3].textContent.trim() : '');
-        if (companyPrompt === null) return;
+        const row = (deleteButton || editButton).closest('tr');
+    if (!row) return;
+    const contactId = (deleteButton || editButton).dataset.contactId || row.dataset.contactId || '';
+    if (!contactId) {
+      alert(gcCrmData.strings.error);
+      return;
+    }
 
-        const payload = {
-          contact_id: editButton.dataset.contactId || row.dataset.contactId || '',
-          first_name: firstPrompt.trim(),
-          last_name: lastPrompt.trim(),
-          email: emailPrompt.trim(),
-          phone: phonePrompt.trim(),
-          company: companyPrompt.trim(),
-        };
+            if (deleteButton) {
+      if (!confirmAction('Delete this contact and related leads? This cannot be undone.')) return;
+      const result = await request('gc_crm_delete_contact', { contact_id: contactId });
+      alert((result.data && result.data.message) || (result.success ? 'Contact deleted.' : gcCrmData.strings.error));
+      if (result.success) row.remove();
+      return;
+    }
 
-        const result = await request('gc_crm_update_contact', payload);
-        alert((result.data && result.data.message) || (result.success ? 'Contact updated.' : gcCrmData.strings.error));
-        if (result.success) {
-          row.children[0].textContent = `${payload.first_name} ${payload.last_name}`.trim();
-          row.children[1].textContent = payload.email;
-          row.children[2].textContent = payload.phone;
-          row.children[3].textContent = payload.company;
-        }
-      }
-    });
-  }
+    const currentName = row.children[0] ? row.children[0].textContent.trim() : '';
+    const firstPrompt = window.prompt('First name', currentName.split(' ')[0] || '');
+    if (firstPrompt === null) return;
+    const lastPrompt = window.prompt('Last name', currentName.split(' ').slice(1).join(' ') || '');
+    if (lastPrompt === null) return;
+    const emailPrompt = window.prompt('Email', row.children[1] ? row.children[1].textContent.trim() : '');
+    if (emailPrompt === null) return;
+    const phonePrompt = window.prompt('Phone', row.children[2] ? row.children[2].textContent.trim() : '');
+    if (phonePrompt === null) return;
+    const companyPrompt = window.prompt('Company', row.children[3] ? row.children[3].textContent.trim() : '');
+    if (companyPrompt === null) return;
+
+    const payload = {
+      contact_id: contactId,
+      first_name: firstPrompt.trim(),
+      last_name: lastPrompt.trim(),
+      email: emailPrompt.trim(),
+      phone: phonePrompt.trim(),
+      company: companyPrompt.trim(),
+    };
+
+    const result = await request('gc_crm_update_contact', payload);
+    alert((result.data && result.data.message) || (result.success ? 'Contact updated.' : gcCrmData.strings.error));
+    if (result.success) {
+      row.children[0].textContent = `${payload.first_name} ${payload.last_name}`.trim();
+      row.children[1].textContent = payload.email;
+      row.children[2].textContent = payload.phone;
+      row.children[3].textContent = payload.company;
+    }
+  });
 })();
