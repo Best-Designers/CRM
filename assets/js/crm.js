@@ -2,7 +2,7 @@
   'use strict';
 
   const board = document.getElementById('gc-crm-board');
-  if (!board || typeof gcCrmData === 'undefined') return;
+  if (typeof gcCrmData === 'undefined') return;
 
   let dragging = null;
 
@@ -50,31 +50,48 @@
     });
   }
 
-  board.querySelectorAll('.gc-crm-lead').forEach((card) => {
-    card.addEventListener('dragstart', () => {
-      dragging = card;
-      card.classList.add('is-dragging');
+  if (board) {
+    board.querySelectorAll('.gc-crm-lead').forEach((card) => {
+      card.addEventListener('dragstart', () => {
+        dragging = card;
+        card.classList.add('is-dragging');
+      });
+      card.addEventListener('dragend', () => {
+        card.classList.remove('is-dragging');
+        dragging = null;
+      });
     });
-    card.addEventListener('dragend', () => {
-      card.classList.remove('is-dragging');
-      dragging = null;
-    });
-  });
+    
+    board.querySelectorAll('.gc-crm-dropzone').forEach((zone) => {
+      zone.addEventListener('dragover', (e) => e.preventDefault());
+      zone.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        if (!dragging) return;
+        const column = zone.closest('.gc-crm-column');
+        const status = column ? column.dataset.status : '';
+        if (!status) return;
+        zone.prepend(dragging);
 
-  board.querySelectorAll('.gc-crm-dropzone').forEach((zone) => {
-    zone.addEventListener('dragover', (e) => e.preventDefault());
-    zone.addEventListener('drop', async (e) => {
-      e.preventDefault();
-      if (!dragging) return;
-      const column = zone.closest('.gc-crm-column');
-      const status = column ? column.dataset.status : '';
-      if (!status) return;
-      zone.prepend(dragging);
-
-      const result = await request('gc_crm_update_lead_status', { lead_id: dragging.dataset.leadId, status });
-      if (!result.success) alert((result.data && result.data.message) || gcCrmData.strings.error);
+        const result = await request('gc_crm_update_lead_status', { lead_id: dragging.dataset.leadId, status });
+        if (!result.success) alert((result.data && result.data.message) || gcCrmData.strings.error);
+      });
     });
-  });
+
+  board.addEventListener('click', async (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement) || !target.classList.contains('gc-crm-lead-remove')) return;
+      const leadId = target.dataset.leadId;
+      if (!leadId) return;
+      if (!confirmAction('Remove this lead from pipeline? This cannot be undone.')) return;
+
+      const result = await request('gc_crm_delete_lead', { lead_id: leadId });
+      alert((result.data && result.data.message) || (result.success ? 'Lead deleted.' : gcCrmData.strings.error));
+      if (result.success) {
+        const card = target.closest('.gc-crm-lead');
+        if (card) card.remove();
+      }
+    });
+  }
 
   const modal = document.getElementById('gc-crm-lead-modal');
   const content = document.getElementById('gc-crm-lead-content');
@@ -210,6 +227,7 @@
   const applyFilters = () => {
     const query = (searchInput?.value || '').toLowerCase();
     const status = statusFilter?.value || '';
+    if (!board) return;
     board.querySelectorAll('.gc-crm-lead').forEach((card) => {
       const text = card.textContent.toLowerCase();
       const cardStatus = card.dataset.status;
@@ -297,15 +315,57 @@
     });
   }
 
-  document.querySelectorAll('.gc-crm-delete-contact').forEach((btn) => {
-    btn.addEventListener('click', async () => {
-      if (!confirmAction('Delete this contact and related leads? This cannot be undone.')) return;
-      const result = await request('gc_crm_delete_contact', { contact_id: btn.dataset.contactId });
-      alert((result.data && result.data.message) || (result.success ? 'Contact deleted.' : gcCrmData.strings.error));
-      if (result.success) {
-        const row = btn.closest('tr');
-        if (row) row.remove();
+  const contactsTable = document.querySelector('.gc-crm-table');
+  if (contactsTable) {
+    contactsTable.addEventListener('click', async (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      if (target.classList.contains('gc-crm-delete-contact')) {
+        if (!confirmAction('Delete this contact and related leads? This cannot be undone.')) return;
+        const result = await request('gc_crm_delete_contact', { contact_id: target.dataset.contactId });
+        alert((result.data && result.data.message) || (result.success ? 'Contact deleted.' : gcCrmData.strings.error));
+        if (result.success) {
+          const row = target.closest('tr');
+          if (row) row.remove();
+        }
+        return;
+      }
+
+      if (target.classList.contains('gc-crm-edit-contact')) {
+        const row = target.closest('tr');
+        if (!row) return;
+
+        const currentName = row.children[0] ? row.children[0].textContent.trim() : '';
+        const firstPrompt = window.prompt('First name', currentName.split(' ')[0] || '');
+        if (firstPrompt === null) return;
+        const lastPrompt = window.prompt('Last name', currentName.split(' ').slice(1).join(' ') || '');
+        if (lastPrompt === null) return;
+        const emailPrompt = window.prompt('Email', row.children[1] ? row.children[1].textContent.trim() : '');
+        if (emailPrompt === null) return;
+        const phonePrompt = window.prompt('Phone', row.children[2] ? row.children[2].textContent.trim() : '');
+        if (phonePrompt === null) return;
+        const companyPrompt = window.prompt('Company', row.children[3] ? row.children[3].textContent.trim() : '');
+        if (companyPrompt === null) return;
+
+        const payload = {
+          contact_id: target.dataset.contactId,
+          first_name: firstPrompt.trim(),
+          last_name: lastPrompt.trim(),
+          email: emailPrompt.trim(),
+          phone: phonePrompt.trim(),
+          company: companyPrompt.trim(),
+        };
+
+        const result = await request('gc_crm_update_contact', payload);
+        alert((result.data && result.data.message) || (result.success ? 'Contact updated.' : gcCrmData.strings.error));
+        if (result.success) {
+          row.children[0].textContent = `${payload.first_name} ${payload.last_name}`.trim();
+          row.children[1].textContent = payload.email;
+          row.children[2].textContent = payload.phone;
+          row.children[3].textContent = payload.company;
+        }
       }
     });
-  });
+  }
 })();
