@@ -15,13 +15,21 @@
   const request = async (action, data = {}, method = 'POST') => {
     const payload = new URLSearchParams({ action, nonce: gcCrmData.nonce, ...data });
     const url = method === 'GET' ? `${gcCrmData.ajaxUrl}?${payload.toString()}` : gcCrmData.ajaxUrl;
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
-      body: method === 'POST' ? payload.toString() : undefined,
-      credentials: 'same-origin',
-    });
-    return response.json();
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+        body: method === 'POST' ? payload.toString() : undefined,
+        credentials: 'same-origin',
+      });
+      const result = await response.json();
+      if (!response.ok && result && typeof result === 'object' && result.success === undefined) {
+        return { success: false, data: { message: gcCrmData.strings.error } };
+      }
+      return result;
+    } catch (error) {
+      return { success: false, data: { message: gcCrmData.strings.error } };
+    }
   };
 
   const refreshSoon = () => setTimeout(() => window.location.reload(), 250);
@@ -75,21 +83,6 @@
         const result = await request('gc_crm_update_lead_status', { lead_id: dragging.dataset.leadId, status });
         if (!result.success) alert((result.data && result.data.message) || gcCrmData.strings.error);
       });
-    });
-
-  board.addEventListener('click', async (e) => {
-      const target = e.target;
-      if (!(target instanceof HTMLElement) || !target.classList.contains('gc-crm-lead-remove')) return;
-      const leadId = target.dataset.leadId;
-      if (!leadId) return;
-      if (!confirmAction('Remove this lead from pipeline? This cannot be undone.')) return;
-
-      const result = await request('gc_crm_delete_lead', { lead_id: leadId });
-      alert((result.data && result.data.message) || (result.success ? 'Lead deleted.' : gcCrmData.strings.error));
-      if (result.success) {
-        const card = target.closest('.gc-crm-lead');
-        if (card) card.remove();
-      }
     });
   }
 
@@ -268,22 +261,6 @@
   }
 
   if (todoList) {
-    todoList.addEventListener('change', async (e) => {
-      const target = e.target;
-      if (!(target instanceof HTMLInputElement) || !target.classList.contains('gc-crm-todo-check')) return;
-      const item = target.closest('.gc-crm-todo-item');
-      if (!item) return;
-      const checked = target.checked ? '1' : '0';
-      const textEl = item.querySelector('.gc-crm-todo-text');
-      const result = await request('gc_crm_update_todo', { todo_id: item.dataset.todoId, checked, text: textEl ? textEl.textContent.trim() : '' });
-      if (!result.success) {
-        target.checked = !target.checked;
-        alert((result.data && result.data.message) || gcCrmData.strings.error);
-        return;
-      }
-      item.classList.toggle('is-checked', target.checked);
-    });
-
     todoList.addEventListener('click', async (e) => {
       const target = e.target;
       if (!(target instanceof HTMLElement)) return;
