@@ -34,6 +34,15 @@ $export_base  = home_url(add_query_arg([]));
             <div class="gc-crm-card"><strong><?php esc_html_e('Closed Sales', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html((string) $data['totals']['closed_sales']); ?></span></div>
             <div class="gc-crm-card"><strong><?php esc_html_e('Total Contacts', 'gc-dealership-crm'); ?></strong><span><?php echo esc_html((string) $data['totals']['total_contacts']); ?></span></div>
         </div>
+        
+        <div class="gc-crm-report-card gc-crm-todo">
+            <h4><?php esc_html_e('Sales Team To-Do', 'gc-dealership-crm'); ?></h4>
+            <ul>
+                <?php foreach (($data['todo_items'] ?? []) as $todo) : ?>
+                    <li><span><?php echo esc_html($todo); ?></span></li>
+                <?php endforeach; ?>
+            </ul>
+        </div>
     </section>
 
     <section class="gc-crm-view" data-view="leads">
