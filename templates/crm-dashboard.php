@@ -60,7 +60,7 @@ $export_base  = home_url(add_query_arg([]));
                             <?php if (empty($todo['is_auto'])) : ?>
                                 <button type="button" class="gc-crm-todo-edit"><?php esc_html_e('Edit', 'gc-dealership-crm'); ?></button>
                             <?php endif; ?>
-                            <button type="button" class="gc-crm-todo-remove" aria-label="<?php esc_attr_e('Remove task', 'gc-dealership-crm'); ?>">&times;</button>
+                            <span class="gc-crm-todo-delete" role="button" tabindex="0" aria-label="<?php esc_attr_e('Remove task', 'gc-dealership-crm'); ?>"><?php esc_html_e('Delete', 'gc-dealership-crm'); ?></span>
                         </div>
                     </li>
                 <?php endforeach; ?>
