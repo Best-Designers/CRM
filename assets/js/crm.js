@@ -81,7 +81,11 @@
         zone.prepend(dragging);
 
         const result = await request('gc_crm_update_lead_status', { lead_id: dragging.dataset.leadId, status });
-        if (!result.success) alert((result.data && result.data.message) || gcCrmData.strings.error);
+        if (!result.success) {
+          alert((result.data && result.data.message) || gcCrmData.strings.error);
+          return;
+        }
+        refreshSoon();
       });
     });
   }
@@ -297,15 +301,23 @@ const archiveLead = document.getElementById('gc-crm-archive-lead');
   }
 
   if (todoList) {
+        todoList.addEventListener('keydown', (e) => {
+      const target = e.target instanceof Element ? e.target : null;
+      if (!target || !target.classList.contains('gc-crm-todo-delete')) return;
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      target.click();
+    });
+
     todoList.addEventListener('click', async (e) => {
-      const target = e.target;
-      if (!(target instanceof HTMLElement)) return;
+      const target = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
+      if (!(target instanceof Element)) return;
       const item = target.closest('.gc-crm-todo-item');
       if (!item) return;
       const todoId = item.dataset.todoId;
       if (!todoId) return;
 
-      const removeButton = target.closest('.gc-crm-todo-remove');
+      const removeButton = target.closest('.gc-crm-todo-delete');
       const editButton = target.closest('.gc-crm-todo-edit');
 
       if (removeButton) {
@@ -334,8 +346,8 @@ const archiveLead = document.getElementById('gc-crm-archive-lead');
   const contactsTable = document.querySelector('.gc-crm-table');
   if (contactsTable) {
     contactsTable.addEventListener('click', async (e) => {
-      const target = e.target;
-      if (!(target instanceof HTMLElement)) return;
+      const target = e.target instanceof Element ? e.target : e.target && e.target.parentElement;
+      if (!(target instanceof Element)) return;
 const deleteButton = target.closest('.gc-crm-delete-contact');
       const editButton = target.closest('.gc-crm-edit-contact');
       
