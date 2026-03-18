@@ -25,6 +25,7 @@
   };
 
   const refreshSoon = () => setTimeout(() => window.location.reload(), 250);
+  const confirmAction = (message) => window.confirm(message);
 
   document.querySelectorAll('.gc-crm-nav__item').forEach((item) => {
     item.addEventListener('click', () => {
@@ -84,6 +85,7 @@
     const saveLead = document.getElementById('gc-crm-save-lead');
     const saveNote = document.getElementById('gc-crm-note-save');
     const sendQuote = document.getElementById('gc-crm-send-quote');
+    const deleteLead = document.getElementById('gc-crm-delete-lead');
 
     if (saveLead) {
       saveLead.addEventListener('click', async () => {
@@ -125,6 +127,15 @@
         if (result.success) refreshSoon();
       });
     }
+    
+    if (deleteLead) {
+      deleteLead.addEventListener('click', async () => {
+        if (!confirmAction('Delete this lead? This cannot be undone.')) return;
+        const result = await request('gc_crm_delete_lead', { lead_id: lead.id });
+        alert((result.data && result.data.message) || (result.success ? 'Lead deleted.' : gcCrmData.strings.error));
+        if (result.success) refreshSoon();
+      });
+    }
   };
 
   document.querySelectorAll('.gc-crm-open-lead').forEach((btn) => {
@@ -156,6 +167,7 @@
             <label>Assigned User</label><select id="gc-assigned"><option value="0">Unassigned</option>${userOptions}</select>
             <label>Estimated Value</label><input id="gc-value" type="number" step="0.01" value="${escapeHtml(lead.estimated_value || 0)}" />
             <button type="button" id="gc-crm-save-lead">Save Lead</button>
+            <button type="button" id="gc-crm-delete-lead">Delete Lead</button>
           </div>
           <div>
             <h4>Interested Product(s)</h4>
@@ -207,4 +219,93 @@
 
   if (searchInput) searchInput.addEventListener('input', applyFilters);
   if (statusFilter) statusFilter.addEventListener('change', applyFilters);
+  
+  const todoList = document.getElementById('gc-crm-todo-list');
+  const todoAddForm = document.getElementById('gc-crm-todo-add-form');
+  const todoAddInput = document.getElementById('gc-crm-todo-add-input');
+  const todoClearButton = document.getElementById('gc-crm-todo-clear');
+
+  if (todoAddForm && todoAddInput) {
+    todoAddForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const text = todoAddInput.value.trim();
+      if (!text) return;
+
+      const result = await request('gc_crm_add_todo', { text });
+      alert((result.data && result.data.message) || (result.success ? 'Task added.' : gcCrmData.strings.error));
+      if (result.success) {
+        todoAddInput.value = '';
+        refreshSoon();
+      }
+    });
+  }
+
+  if (todoClearButton) {
+    todoClearButton.addEventListener('click', async () => {
+      if (!confirmAction('Clear all to-do items?')) return;
+      const result = await request('gc_crm_clear_todos');
+      alert((result.data && result.data.message) || (result.success ? 'To-do list cleared.' : gcCrmData.strings.error));
+      if (result.success) refreshSoon();
+    });
+  }
+
+  if (todoList) {
+    todoList.addEventListener('change', async (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLInputElement) || !target.classList.contains('gc-crm-todo-check')) return;
+      const item = target.closest('.gc-crm-todo-item');
+      if (!item) return;
+      const checked = target.checked ? '1' : '0';
+      const textEl = item.querySelector('.gc-crm-todo-text');
+      const result = await request('gc_crm_update_todo', { todo_id: item.dataset.todoId, checked, text: textEl ? textEl.textContent.trim() : '' });
+      if (!result.success) {
+        target.checked = !target.checked;
+        alert((result.data && result.data.message) || gcCrmData.strings.error);
+        return;
+      }
+      item.classList.toggle('is-checked', target.checked);
+    });
+
+    todoList.addEventListener('click', async (e) => {
+      const target = e.target;
+      if (!(target instanceof HTMLElement)) return;
+      const item = target.closest('.gc-crm-todo-item');
+      if (!item) return;
+      const todoId = item.dataset.todoId;
+      if (!todoId) return;
+
+      if (target.classList.contains('gc-crm-todo-remove')) {
+        const result = await request('gc_crm_delete_todo', { todo_id: todoId });
+        alert((result.data && result.data.message) || (result.success ? 'Task removed.' : gcCrmData.strings.error));
+        if (result.success) item.remove();
+      }
+
+      if (target.classList.contains('gc-crm-todo-edit')) {
+        const textEl = item.querySelector('.gc-crm-todo-text');
+        const currentText = textEl ? textEl.textContent.trim() : '';
+        const nextText = window.prompt('Edit to-do item', currentText);
+        if (nextText === null) return;
+        const cleanText = nextText.trim();
+        if (!cleanText) return;
+        const result = await request('gc_crm_update_todo', { todo_id: todoId, text: cleanText });
+        if (!result.success) {
+          alert((result.data && result.data.message) || gcCrmData.strings.error);
+          return;
+        }
+        if (textEl) textEl.textContent = cleanText;
+      }
+    });
+  }
+
+  document.querySelectorAll('.gc-crm-delete-contact').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirmAction('Delete this contact and related leads? This cannot be undone.')) return;
+      const result = await request('gc_crm_delete_contact', { contact_id: btn.dataset.contactId });
+      alert((result.data && result.data.message) || (result.success ? 'Contact deleted.' : gcCrmData.strings.error));
+      if (result.success) {
+        const row = btn.closest('tr');
+        if (row) row.remove();
+      }
+    });
+  });
 })();
