@@ -18,6 +18,7 @@ class GC_CRM_Ajax {
         add_action('wp_ajax_gc_crm_clear_todos', [__CLASS__, 'clear_todos']);
         add_action('wp_ajax_gc_crm_delete_lead', [__CLASS__, 'delete_lead']);
         add_action('wp_ajax_gc_crm_delete_contact', [__CLASS__, 'delete_contact']);
+        add_action('wp_ajax_gc_crm_update_contact', [__CLASS__, 'update_contact']);
     }
 
     private static function guard(): void {
@@ -388,5 +389,46 @@ class GC_CRM_Ajax {
         }
 
         wp_send_json_success(['message' => __('Contact deleted.', 'gc-dealership-crm')]);
+    }
+    
+    public static function update_contact(): void {
+        self::guard();
+
+        $contact_id = isset($_POST['contact_id']) ? absint($_POST['contact_id']) : 0;
+        $first_name = isset($_POST['first_name']) ? sanitize_text_field(wp_unslash($_POST['first_name'])) : '';
+        $last_name  = isset($_POST['last_name']) ? sanitize_text_field(wp_unslash($_POST['last_name'])) : '';
+        $email      = isset($_POST['email']) ? sanitize_email(wp_unslash($_POST['email'])) : '';
+        $phone      = isset($_POST['phone']) ? sanitize_text_field(wp_unslash($_POST['phone'])) : '';
+        $company    = isset($_POST['company']) ? sanitize_text_field(wp_unslash($_POST['company'])) : '';
+
+        if (! $contact_id) {
+            wp_send_json_error(['message' => __('Invalid contact id.', 'gc-dealership-crm')], 400);
+        }
+
+        if ($email === '' && $phone === '') {
+            wp_send_json_error(['message' => __('Email or phone is required.', 'gc-dealership-crm')], 400);
+        }
+
+        global $wpdb;
+        $updated = $wpdb->update(
+            GC_CRM_DB::table('contacts'),
+            [
+                'first_name' => $first_name,
+                'last_name'  => $last_name,
+                'email'      => $email,
+                'phone'      => $phone,
+                'company'    => $company,
+                'updated_at' => GC_CRM_DB::now(),
+            ],
+            ['id' => $contact_id],
+            ['%s', '%s', '%s', '%s', '%s', '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            wp_send_json_error(['message' => __('Unable to update contact.', 'gc-dealership-crm')], 500);
+        }
+
+        wp_send_json_success(['message' => __('Contact updated.', 'gc-dealership-crm')]);
     }
 }
