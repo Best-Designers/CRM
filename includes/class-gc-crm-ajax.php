@@ -17,6 +17,7 @@ class GC_CRM_Ajax {
         add_action('wp_ajax_gc_crm_delete_todo', [__CLASS__, 'delete_todo']);
         add_action('wp_ajax_gc_crm_clear_todos', [__CLASS__, 'clear_todos']);
         add_action('wp_ajax_gc_crm_delete_lead', [__CLASS__, 'delete_lead']);
+        add_action('wp_ajax_gc_crm_archive_lead', [__CLASS__, 'archive_lead']);
         add_action('wp_ajax_gc_crm_delete_contact', [__CLASS__, 'delete_contact']);
         add_action('wp_ajax_gc_crm_update_contact', [__CLASS__, 'update_contact']);
     }
@@ -43,7 +44,7 @@ class GC_CRM_Ajax {
             wp_send_json_error(['message' => __('Email or phone is required.', 'gc-dealership-crm')], 400);
         }
 
-        $allowed = ['new_leads', 'contacted', 'quote_sent', 'sold', 'lost'];
+        $allowed = ['new_leads', 'contacted', 'quote_sent', 'sold', 'archived_sold', 'lost'];
         if (! in_array($status, $allowed, true)) {
             $status = 'new_leads';
         }
@@ -74,7 +75,7 @@ class GC_CRM_Ajax {
 
         $lead_id = isset($_POST['lead_id']) ? absint($_POST['lead_id']) : 0;
         $status  = isset($_POST['status']) ? sanitize_key(wp_unslash($_POST['status'])) : '';
-        $allowed = ['new_leads', 'contacted', 'quote_sent', 'sold', 'lost'];
+        $allowed = ['new_leads', 'contacted', 'quote_sent', 'sold', 'archived_sold', 'lost'];
 
         if (! $lead_id || ! in_array($status, $allowed, true)) {
             wp_send_json_error(['message' => __('Invalid data', 'gc-dealership-crm')], 400);
@@ -362,6 +363,40 @@ class GC_CRM_Ajax {
         }
 
         wp_send_json_success(['message' => __('Lead deleted.', 'gc-dealership-crm')]);
+    }
+
+        public static function archive_lead(): void {
+        self::guard();
+
+        $lead_id = isset($_POST['lead_id']) ? absint($_POST['lead_id']) : 0;
+        if (! $lead_id) {
+            wp_send_json_error(['message' => __('Invalid lead id.', 'gc-dealership-crm')], 400);
+        }
+
+        global $wpdb;
+        $current_status = (string) $wpdb->get_var($wpdb->prepare('SELECT status FROM ' . GC_CRM_DB::table('leads') . ' WHERE id = %d', $lead_id));
+        if ($current_status === '') {
+            wp_send_json_error(['message' => __('Lead not found.', 'gc-dealership-crm')], 404);
+        }
+
+        if ($current_status !== 'sold') {
+            wp_send_json_error(['message' => __('Only sold leads can be archived.', 'gc-dealership-crm')], 400);
+        }
+
+        $updated = $wpdb->update(
+            GC_CRM_DB::table('leads'),
+            ['status' => 'archived_sold', 'updated_at' => GC_CRM_DB::now()],
+            ['id' => $lead_id],
+            ['%s', '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            wp_send_json_error(['message' => __('Unable to archive lead.', 'gc-dealership-crm')], 500);
+        }
+
+        GC_CRM_Integrations::log_activity($lead_id, get_current_user_id(), 'lead_archived', 'Sold lead archived from pipeline.');
+        wp_send_json_success(['message' => __('Lead archived.', 'gc-dealership-crm')]);
     }
 
     public static function delete_contact(): void {
