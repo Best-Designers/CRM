@@ -10,6 +10,8 @@ class GC_CRM_Integrations {
         add_action('wp_enqueue_scripts', [__CLASS__, 'maybe_enqueue_product_assets']);
         add_action('woocommerce_after_add_to_cart_button', [__CLASS__, 'render_inquiry_button']);
         add_action('wp_footer', [__CLASS__, 'render_product_modal']);
+        add_action('admin_menu', [__CLASS__, 'register_admin_page']);
+        add_action('admin_init', [__CLASS__, 'register_settings']);
     }
 
     public static function maybe_enqueue_product_assets(): void {
@@ -85,6 +87,86 @@ class GC_CRM_Integrations {
         return ! empty($forms[0]) ? (int) $forms[0] : 0;
     }
 
+      public static function register_admin_page(): void {
+        add_options_page(
+            __('Golf Cart CRM Settings', 'gc-dealership-crm'),
+            __('Golf Cart CRM', 'gc-dealership-crm'),
+            'manage_options',
+            'gc-crm-settings',
+            [__CLASS__, 'render_admin_page']
+        );
+    }
+
+    public static function register_settings(): void {
+        register_setting(
+            'gc_crm_settings',
+            'gc_crm_cf7_form_id',
+            [
+                'type'              => 'integer',
+                'sanitize_callback' => 'absint',
+                'default'           => 0,
+            ]
+        );
+
+        add_settings_section(
+            'gc_crm_cf7_section',
+            __('Contact Form 7 Integration', 'gc-dealership-crm'),
+            static function (): void {
+                echo '<p>' . esc_html__('Choose which Contact Form 7 form should be rendered by the product inquiry modal.', 'gc-dealership-crm') . '</p>';
+            },
+            'gc-crm-settings'
+        );
+
+        add_settings_field(
+            'gc_crm_cf7_form_id',
+            __('Inquiry Form', 'gc-dealership-crm'),
+            [__CLASS__, 'render_cf7_form_field'],
+            'gc-crm-settings',
+            'gc_crm_cf7_section'
+        );
+    }
+
+    public static function render_admin_page(): void {
+        if (! current_user_can('manage_options')) {
+            return;
+        }
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('Golf Cart CRM Settings', 'gc-dealership-crm'); ?></h1>
+            <form method="post" action="options.php">
+                <?php
+                settings_fields('gc_crm_settings');
+                do_settings_sections('gc-crm-settings');
+                submit_button();
+                ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    public static function render_cf7_form_field(): void {
+        $selected = (int) get_option('gc_crm_cf7_form_id', 0);
+        $forms    = get_posts([
+            'post_type'      => 'wpcf7_contact_form',
+            'post_status'    => 'publish',
+            'posts_per_page' => -1,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+        ]);
+
+        echo '<select name="gc_crm_cf7_form_id" id="gc_crm_cf7_form_id">';
+        echo '<option value="0">' . esc_html__('Auto-select first form', 'gc-dealership-crm') . '</option>';
+        foreach ($forms as $form) {
+            printf(
+                '<option value="%1$d" %2$s>%3$s (#%1$d)</option>',
+                (int) $form->ID,
+                selected($selected, (int) $form->ID, false),
+                esc_html(get_the_title($form))
+            );
+        }
+        echo '</select>';
+    }
+
     public static function capture_cf7_submission($contact_form): void {
         if (! class_exists('WPCF7_Submission')) {
             return;
@@ -106,6 +188,15 @@ class GC_CRM_Integrations {
         $phone      = self::extract_field($posted_data, $map, 'phone');
         $message    = self::extract_field($posted_data, $map, 'message');
         $source     = self::extract_field($posted_data, $map, 'source');
+        $product_estimated_value = (float) self::extract_field($posted_data, $map, 'product_price');
+
+        if ($first_name && ! $last_name && strpos($first_name, ' ') !== false) {
+            $name_parts = preg_split('/\s+/', trim($first_name));
+            if (is_array($name_parts) && count($name_parts) > 1) {
+                $last_name  = (string) array_pop($name_parts);
+                $first_name = implode(' ', $name_parts);
+            }
+        }
 
         if (! $email && ! $phone) {
             return;
@@ -166,7 +257,7 @@ class GC_CRM_Integrations {
                 'status'           => 'new_leads',
                 'title'            => $lead_title,
                 'details'          => wp_kses_post($message),
-                'estimated_value'  => 0,
+                'estimated_value'  => $product_estimated_value,
                 'created_at'       => GC_CRM_DB::now(),
                 'updated_at'       => GC_CRM_DB::now(),
             ],
@@ -254,8 +345,8 @@ If you have specific requirements (seats, range, accessories), just reply to thi
         }
 
         $fallback_map = [
-            'first_name' => ['first_name', 'your-name', 'name', 'fname'],
-            'last_name'  => ['last_name', 'lname', 'last-name'],
+            'first_name' => ['first_name', 'your-first-name', 'first-name', 'your-name', 'name', 'fname'],
+            'last_name'  => ['last_name', 'your-last-name', 'last-name', 'lname'],
             'email'      => ['your-email', 'email', 'user_email'],
             'phone'      => ['your-phone', 'phone', 'tel', 'mobile'],
             'message'    => ['your-message', 'message', 'inquiry'],
