@@ -205,29 +205,28 @@ class GC_CRM_Shortcode {
         $quote_sent_count = (int) ($wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$leads_table} WHERE status = %s", 'quote_sent')) ?? 0);
         $unassigned_count = (int) ($wpdb->get_var("SELECT COUNT(*) FROM {$leads_table} WHERE assigned_user_id = 0") ?? 0);
 
-        $todo_items = [];
+        $auto_todo_items = [];
 
         if ($new_leads_count > 0) {
-            $todo_items[] = sprintf(
+            $auto_todo_items['new_leads'] = sprintf(
                 __('Call %d new lead(s) about test drives today.', 'gc-dealership-crm'),
                 $new_leads_count
             );
         }
         if ($quote_sent_count > 0) {
-            $todo_items[] = sprintf(
+            $auto_todo_items['quote_sent'] = sprintf(
                 __('Follow up on %d quote(s) with financing and accessory options.', 'gc-dealership-crm'),
                 $quote_sent_count
             );
         }
         if ($unassigned_count > 0) {
-            $todo_items[] = sprintf(
+            $auto_todo_items['unassigned'] = sprintf(
                 __('Assign %d unassigned lead(s) to a sales rep before close.', 'gc-dealership-crm'),
                 $unassigned_count
             );
         }
 
-        $todo_items[] = __('Check trade-in inquiries and prep appraisal responses.', 'gc-dealership-crm');
-        $todo_items[] = __('Send weekend promo to warm leads interested in lifted carts.', 'gc-dealership-crm');
+        $todo_items = self::build_todo_items($auto_todo_items);
 
         return [
             'totals'         => $totals,
@@ -237,5 +236,96 @@ class GC_CRM_Shortcode {
             'report_product' => $report_product,
             'todo_items'     => $todo_items,
         ];
+    }
+    
+    private static function build_todo_items(array $auto_todo_items): array {
+        $state = self::get_todo_state();
+        $items = [];
+
+        foreach ($auto_todo_items as $key => $text) {
+            $saved_auto = $state['auto'][$key] ?? [];
+            $same_text = isset($saved_auto['text']) && $saved_auto['text'] === $text;
+            $items[] = [
+                'id'      => 'auto:' . $key,
+                'text'    => $text,
+                'checked' => $same_text ? ! empty($saved_auto['checked']) : false,
+                'removed' => $same_text ? ! empty($saved_auto['removed']) : false,
+                'is_auto' => true,
+            ];
+        }
+
+        foreach ($state['manual'] as $manual_item) {
+            $manual_text = isset($manual_item['text']) ? trim((string) $manual_item['text']) : '';
+            if ($manual_text === '') {
+                continue;
+            }
+
+            $items[] = [
+                'id'      => (string) ($manual_item['id'] ?? ''),
+                'text'    => $manual_text,
+                'checked' => ! empty($manual_item['checked']),
+                'removed' => false,
+                'is_auto' => false,
+            ];
+        }
+
+        return $items;
+    }
+
+    public static function get_todo_state(): array {
+        $saved = get_option('gc_crm_todo_state', []);
+        $manual = [];
+        $auto = [];
+
+        if (is_array($saved)) {
+            if (! empty($saved['manual']) && is_array($saved['manual'])) {
+                $manual = array_values($saved['manual']);
+            }
+            if (! empty($saved['auto']) && is_array($saved['auto'])) {
+                $auto = $saved['auto'];
+            }
+        }
+
+        return ['manual' => $manual, 'auto' => $auto];
+    }
+
+    public static function save_todo_state(array $state): void {
+        $manual_items = [];
+        foreach (($state['manual'] ?? []) as $item) {
+            $text = isset($item['text']) ? sanitize_text_field((string) $item['text']) : '';
+            if ($text === '') {
+                continue;
+            }
+
+            $id = isset($item['id']) ? sanitize_key((string) $item['id']) : '';
+            if ($id === '') {
+                $id = 'manual_' . wp_generate_uuid4();
+            }
+
+            $manual_items[] = [
+                'id'      => $id,
+                'text'    => $text,
+                'checked' => ! empty($item['checked']),
+            ];
+        }
+
+        $auto_items = [];
+        foreach (($state['auto'] ?? []) as $key => $item) {
+            $safe_key = sanitize_key((string) $key);
+            if ($safe_key === '') {
+                continue;
+            }
+
+            $auto_items[$safe_key] = [
+                'text'    => isset($item['text']) ? sanitize_text_field((string) $item['text']) : '',
+                'checked' => ! empty($item['checked']),
+                'removed' => ! empty($item['removed']),
+            ];
+        }
+
+        update_option('gc_crm_todo_state', [
+            'manual' => $manual_items,
+            'auto'   => $auto_items,
+        ], false);
     }
 }
