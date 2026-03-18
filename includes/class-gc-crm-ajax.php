@@ -12,6 +12,12 @@ class GC_CRM_Ajax {
         add_action('wp_ajax_gc_crm_update_lead', [__CLASS__, 'update_lead']);
         add_action('wp_ajax_gc_crm_create_lead', [__CLASS__, 'create_lead']);
         add_action('wp_ajax_gc_crm_send_quote', [__CLASS__, 'send_quote']);
+        add_action('wp_ajax_gc_crm_add_todo', [__CLASS__, 'add_todo']);
+        add_action('wp_ajax_gc_crm_update_todo', [__CLASS__, 'update_todo']);
+        add_action('wp_ajax_gc_crm_delete_todo', [__CLASS__, 'delete_todo']);
+        add_action('wp_ajax_gc_crm_clear_todos', [__CLASS__, 'clear_todos']);
+        add_action('wp_ajax_gc_crm_delete_lead', [__CLASS__, 'delete_lead']);
+        add_action('wp_ajax_gc_crm_delete_contact', [__CLASS__, 'delete_contact']);
     }
 
     private static function guard(): void {
@@ -215,5 +221,172 @@ class GC_CRM_Ajax {
         GC_CRM_Integrations::log_activity($lead_id, get_current_user_id(), 'quote_sent', 'Quote sent to lead via CRM email workflow.', ['quote_amount' => $quote_amount]);
 
         wp_send_json_success(['message' => __('Quote sent successfully.', 'gc-dealership-crm')]);
+    }
+    
+    public static function add_todo(): void {
+        self::guard();
+
+        $text = isset($_POST['text']) ? sanitize_text_field(wp_unslash($_POST['text'])) : '';
+        if ($text === '') {
+            wp_send_json_error(['message' => __('Task text is required.', 'gc-dealership-crm')], 400);
+        }
+
+        $state = GC_CRM_Shortcode::get_todo_state();
+        $state['manual'][] = [
+            'id'      => 'manual_' . wp_generate_uuid4(),
+            'text'    => $text,
+            'checked' => false,
+        ];
+        GC_CRM_Shortcode::save_todo_state($state);
+
+        wp_send_json_success(['message' => __('Task added.', 'gc-dealership-crm')]);
+    }
+
+    public static function update_todo(): void {
+        self::guard();
+
+        $todo_id  = isset($_POST['todo_id']) ? sanitize_text_field(wp_unslash($_POST['todo_id'])) : '';
+        $text     = isset($_POST['text']) ? sanitize_text_field(wp_unslash($_POST['text'])) : null;
+        $checked  = isset($_POST['checked']) ? (int) $_POST['checked'] : null;
+        $is_auto  = strpos($todo_id, 'auto:') === 0;
+
+        if ($todo_id === '') {
+            wp_send_json_error(['message' => __('Task id is required.', 'gc-dealership-crm')], 400);
+        }
+
+        $state = GC_CRM_Shortcode::get_todo_state();
+
+        if ($is_auto) {
+            $auto_key = sanitize_key(substr($todo_id, 5));
+            if ($auto_key === '') {
+                wp_send_json_error(['message' => __('Invalid auto task id.', 'gc-dealership-crm')], 400);
+            }
+
+            $auto = $state['auto'][$auto_key] ?? [];
+            if ($text !== null) {
+                $auto['text'] = $text;
+            }
+            if ($checked !== null) {
+                $auto['checked'] = $checked === 1;
+            }
+            if (isset($_POST['removed'])) {
+                $auto['removed'] = ((int) $_POST['removed']) === 1;
+            }
+            $state['auto'][$auto_key] = $auto;
+            GC_CRM_Shortcode::save_todo_state($state);
+            wp_send_json_success(['message' => __('Task updated.', 'gc-dealership-crm')]);
+        }
+
+        $found = false;
+        foreach ($state['manual'] as $index => $item) {
+            if (($item['id'] ?? '') !== $todo_id) {
+                continue;
+            }
+            if ($text !== null) {
+                $state['manual'][$index]['text'] = $text;
+            }
+            if ($checked !== null) {
+                $state['manual'][$index]['checked'] = $checked === 1;
+            }
+            $found = true;
+            break;
+        }
+
+        if (! $found) {
+            wp_send_json_error(['message' => __('Task not found.', 'gc-dealership-crm')], 404);
+        }
+
+        GC_CRM_Shortcode::save_todo_state($state);
+        wp_send_json_success(['message' => __('Task updated.', 'gc-dealership-crm')]);
+    }
+
+    public static function delete_todo(): void {
+        self::guard();
+
+        $todo_id = isset($_POST['todo_id']) ? sanitize_text_field(wp_unslash($_POST['todo_id'])) : '';
+        if ($todo_id === '') {
+            wp_send_json_error(['message' => __('Task id is required.', 'gc-dealership-crm')], 400);
+        }
+
+        $state = GC_CRM_Shortcode::get_todo_state();
+        if (strpos($todo_id, 'auto:') === 0) {
+            $auto_key = sanitize_key(substr($todo_id, 5));
+            $auto = $state['auto'][$auto_key] ?? [];
+            $auto['removed'] = true;
+            $state['auto'][$auto_key] = $auto;
+            GC_CRM_Shortcode::save_todo_state($state);
+            wp_send_json_success(['message' => __('Task removed.', 'gc-dealership-crm')]);
+        }
+
+        $state['manual'] = array_values(array_filter($state['manual'], static function ($item) use ($todo_id) {
+            return ($item['id'] ?? '') !== $todo_id;
+        }));
+        GC_CRM_Shortcode::save_todo_state($state);
+
+        wp_send_json_success(['message' => __('Task removed.', 'gc-dealership-crm')]);
+    }
+
+    public static function clear_todos(): void {
+        self::guard();
+
+        $state = GC_CRM_Shortcode::get_todo_state();
+        $state['manual'] = [];
+        foreach ($state['auto'] as $key => $item) {
+            $state['auto'][$key]['removed'] = true;
+            $state['auto'][$key]['checked'] = false;
+        }
+        GC_CRM_Shortcode::save_todo_state($state);
+
+        wp_send_json_success(['message' => __('To-do list cleared.', 'gc-dealership-crm')]);
+    }
+
+    public static function delete_lead(): void {
+        self::guard();
+
+        $lead_id = isset($_POST['lead_id']) ? absint($_POST['lead_id']) : 0;
+        if (! $lead_id) {
+            wp_send_json_error(['message' => __('Invalid lead id.', 'gc-dealership-crm')], 400);
+        }
+
+        global $wpdb;
+
+        $wpdb->delete(GC_CRM_DB::table('notes'), ['lead_id' => $lead_id], ['%d']);
+        $wpdb->delete(GC_CRM_DB::table('activity'), ['lead_id' => $lead_id], ['%d']);
+        $wpdb->delete(GC_CRM_DB::table('deals'), ['lead_id' => $lead_id], ['%d']);
+        $wpdb->delete(GC_CRM_DB::table('product_links'), ['lead_id' => $lead_id], ['%d']);
+        $deleted = $wpdb->delete(GC_CRM_DB::table('leads'), ['id' => $lead_id], ['%d']);
+
+        if (! $deleted) {
+            wp_send_json_error(['message' => __('Unable to delete lead.', 'gc-dealership-crm')], 500);
+        }
+
+        wp_send_json_success(['message' => __('Lead deleted.', 'gc-dealership-crm')]);
+    }
+
+    public static function delete_contact(): void {
+        self::guard();
+
+        $contact_id = isset($_POST['contact_id']) ? absint($_POST['contact_id']) : 0;
+        if (! $contact_id) {
+            wp_send_json_error(['message' => __('Invalid contact id.', 'gc-dealership-crm')], 400);
+        }
+
+        global $wpdb;
+        $lead_ids = $wpdb->get_col($wpdb->prepare('SELECT id FROM ' . GC_CRM_DB::table('leads') . ' WHERE contact_id = %d', $contact_id));
+        foreach ($lead_ids as $lead_id) {
+            $lead_id = (int) $lead_id;
+            $wpdb->delete(GC_CRM_DB::table('notes'), ['lead_id' => $lead_id], ['%d']);
+            $wpdb->delete(GC_CRM_DB::table('activity'), ['lead_id' => $lead_id], ['%d']);
+            $wpdb->delete(GC_CRM_DB::table('deals'), ['lead_id' => $lead_id], ['%d']);
+            $wpdb->delete(GC_CRM_DB::table('product_links'), ['lead_id' => $lead_id], ['%d']);
+            $wpdb->delete(GC_CRM_DB::table('leads'), ['id' => $lead_id], ['%d']);
+        }
+
+        $deleted = $wpdb->delete(GC_CRM_DB::table('contacts'), ['id' => $contact_id], ['%d']);
+        if (! $deleted) {
+            wp_send_json_error(['message' => __('Unable to delete contact.', 'gc-dealership-crm')], 500);
+        }
+
+        wp_send_json_success(['message' => __('Contact deleted.', 'gc-dealership-crm')]);
     }
 }
