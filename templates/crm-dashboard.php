@@ -8,8 +8,11 @@ $label_map = [
     'contacted'  => __('Contacted', 'gc-dealership-crm'),
     'quote_sent' => __('Quote Sent', 'gc-dealership-crm'),
     'sold'       => __('Sold', 'gc-dealership-crm'),
+    'archived_sold' => __('Archived (Sold)', 'gc-dealership-crm'),
     'lost'       => __('Lost', 'gc-dealership-crm'),
 ];
+
+$kanban_statuses = ['new_leads', 'contacted', 'quote_sent', 'sold', 'lost'];
 
 $money = static function ($amount): string {
     return '$' . number_format_i18n((float) $amount, 2);
@@ -41,8 +44,8 @@ $export_base  = home_url(add_query_arg([]));
                 <button type="button" class="gc-crm-todo__clear" id="gc-crm-todo-clear"><?php esc_html_e('Clear All', 'gc-dealership-crm'); ?></button>
             </div>
             <form class="gc-crm-todo__add" id="gc-crm-todo-add-form">
-                <input type="text" id="gc-crm-todo-add-input" placeholder="<?php esc_attr_e('Add a new to-do item', 'gc-dealership-crm'); ?>" />
-                <button type="submit"><?php esc_html_e('Add', 'gc-dealership-crm'); ?></button>
+                <input type="text" id="gc-crm-todo-add-input" name="todo_text" placeholder="<?php esc_attr_e('Add a new to-do item', 'gc-dealership-crm'); ?>" />
+                <button type="submit" id="gc-crm-todo-add-button"><?php esc_html_e('Add', 'gc-dealership-crm'); ?></button>
             </form>
             <ul id="gc-crm-todo-list">
                 <?php foreach (($data['todo_items'] ?? []) as $todo) : ?>
@@ -94,14 +97,16 @@ $export_base  = home_url(add_query_arg([]));
             <input type="search" id="gc-crm-search" placeholder="<?php esc_attr_e('Search by name, email, phone', 'gc-dealership-crm'); ?>" />
             <select id="gc-crm-status-filter">
                 <option value=""><?php esc_html_e('All Statuses', 'gc-dealership-crm'); ?></option>
-                <?php foreach ($label_map as $status_key => $label) : ?>
+                <?php foreach ($kanban_statuses as $status_key) : ?>
+                    <?php $label = $label_map[$status_key] ?? $status_key; ?>
                     <option value="<?php echo esc_attr($status_key); ?>"><?php echo esc_html($label); ?></option>
                 <?php endforeach; ?>
             </select>
         </div>
 
         <div class="gc-crm-board" id="gc-crm-board">
-            <?php foreach ($label_map as $status_key => $label) : ?>
+            <?php foreach ($kanban_statuses as $status_key) : ?>
+                <?php $label = $label_map[$status_key] ?? $status_key; ?>
                 <section class="gc-crm-column" data-status="<?php echo esc_attr($status_key); ?>">
                     <h3><?php echo esc_html($label); ?> <small>(<?php echo esc_html((string) count($data['kanban'][$status_key])); ?>)</small></h3>
                     <div class="gc-crm-dropzone">
