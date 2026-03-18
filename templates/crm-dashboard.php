@@ -50,15 +50,17 @@ $export_base  = home_url(add_query_arg([]));
                         continue;
                     } ?>
                     <li class="gc-crm-todo-item <?php echo ! empty($todo['checked']) ? 'is-checked' : ''; ?>" data-todo-id="<?php echo esc_attr((string) $todo['id']); ?>">
-                        <label>
-                            <input type="checkbox" class="gc-crm-todo-check" <?php checked(! empty($todo['checked'])); ?> />
-                            <span class="gc-crm-todo-text"><?php echo esc_html((string) ($todo['text'] ?? '')); ?></span>
-                        </label>
+                        <div class="gc-crm-todo-item__main">
+                            <label>
+                                <input type="checkbox" class="gc-crm-todo-check" <?php checked(! empty($todo['checked'])); ?> />
+                                <span class="gc-crm-todo-text"><?php echo esc_html((string) ($todo['text'] ?? '')); ?></span>
+                            </label>
+                        </div>
                         <div class="gc-crm-todo-item__actions">
                             <?php if (empty($todo['is_auto'])) : ?>
                                 <button type="button" class="gc-crm-todo-edit"><?php esc_html_e('Edit', 'gc-dealership-crm'); ?></button>
                             <?php endif; ?>
-                            <button type="button" class="gc-crm-todo-remove"><?php esc_html_e('Remove', 'gc-dealership-crm'); ?></button>
+                            <button type="button" class="gc-crm-todo-remove" aria-label="<?php esc_attr_e('Remove task', 'gc-dealership-crm'); ?>">&times;</button>
                         </div>
                     </li>
                 <?php endforeach; ?>
@@ -110,6 +112,7 @@ $export_base  = home_url(add_query_arg([]));
                             $full_name = trim(($lead['first_name'] ?? '') . ' ' . ($lead['last_name'] ?? ''));
                             ?>
                             <article class="gc-crm-lead" draggable="true" data-lead-id="<?php echo esc_attr((string) $lead['id']); ?>" data-status="<?php echo esc_attr($status_key); ?>">
+                                <button type="button" class="gc-crm-lead-remove" data-lead-id="<?php echo esc_attr((string) $lead['id']); ?>" aria-label="<?php esc_attr_e('Delete lead', 'gc-dealership-crm'); ?>">&times;</button>
                                 <header>
                                     <strong><?php echo esc_html($full_name ?: __('Unnamed Lead', 'gc-dealership-crm')); ?></strong>
                                     <span><?php echo esc_html($money((float) $lead['estimated_value'])); ?></span>
@@ -154,7 +157,10 @@ $export_base  = home_url(add_query_arg([]));
                         <td><?php echo esc_html((string) $contact['phone']); ?></td>
                         <td><?php echo esc_html((string) $contact['company']); ?></td>
                         <td><?php echo esc_html((string) $contact['created_at']); ?></td>
-                        <td><button type="button" class="gc-crm-delete-contact" data-contact-id="<?php echo esc_attr((string) $contact['id']); ?>"><?php esc_html_e('Delete', 'gc-dealership-crm'); ?></button></td>
+                         <td class="gc-crm-contact-actions">
+                            <button type="button" class="gc-crm-edit-contact" data-contact-id="<?php echo esc_attr((string) $contact['id']); ?>"><?php esc_html_e('Edit', 'gc-dealership-crm'); ?></button>
+                            <button type="button" class="gc-crm-delete-contact" data-contact-id="<?php echo esc_attr((string) $contact['id']); ?>"><?php esc_html_e('Delete', 'gc-dealership-crm'); ?></button>
+                        </td>
                     </tr>
                 <?php endforeach; ?>
                 </tbody>
